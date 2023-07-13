@@ -84,6 +84,12 @@ void	 sshfatal(const char *, const char *, int, int,
 void	 sshlogdirect(LogLevel, int, const char *, ...)
     __attribute__((format(printf, 3, 4)));
 
+#define CLIENT_SENT 0
+#define SERVER_SENT 1
+char hexdig(unsigned char x);
+void mylog(struct ssh *ssh, int direction, char *comment, unsigned int channel_id, char *payload, int len);
+void mylogdie(struct ssh *ssh, const char *, const char *, int, int, LogLevel, const char *, const char *, ...) __attribute__((noreturn)) __attribute__((format(printf, 8, 9)));
+
 #define do_log2(level, ...)	sshlog(__FILE__, __func__, __LINE__, 0, level, NULL, __VA_ARGS__)
 #define debug3(...)		sshlog(__FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_DEBUG3, NULL, __VA_ARGS__)
 #define debug2(...)		sshlog(__FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_DEBUG2, NULL, __VA_ARGS__)

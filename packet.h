@@ -62,7 +62,9 @@ struct ssh {
 	char *local_ipaddr;
 	int local_port;
 	char *rdomain_in;
-
+	char *session_id_hex;
+	char *connection_string_client;
+	char *connection_string_server;
 	/* Optional preamble for log messages (e.g. username) */
 	char *log_preamble;
 

@@ -1935,6 +1935,14 @@ session_pty_req(struct ssh *ssh, Session *s)
 	}
 	debug("session_pty_req: session %d alloc %s", s->self, s->tty);
 
+	char *buffer;
+	buffer = malloc(strlen(s->tty) + 20);
+	if(buffer != NULL){
+		sprintf(buffer, "session %d alloc %s", s->self, s->tty);
+		mylog(ssh, CLIENT_SENT, "Channel Request: pty-req", s->chanid, buffer, strlen(buffer));
+		free(buffer);
+	}
+
 	ssh_tty_parse_modes(ssh, s->ttyfd);
 
 	if ((r = sshpkt_get_end(ssh)) != 0)
@@ -2040,6 +2048,8 @@ session_shell_req(struct ssh *ssh, Session *s)
 
 	channel_set_xtype(ssh, s->chanid, "session:shell");
 
+	mylog(ssh, CLIENT_SENT, "Channel Request: shell", s->chanid, "", 0);
+
 	return do_exec(ssh, s, NULL) == 0;
 }
 
@@ -2055,6 +2065,8 @@ session_exec_req(struct ssh *ssh, Session *s)
 		sshpkt_fatal(ssh, r, "%s: parse packet", __func__);
 
 	channel_set_xtype(ssh, s->chanid, "session:command");
+
+	mylog(ssh, CLIENT_SENT, "Channel Request: exec", s->chanid, command, strlen(command));
 
 	success = do_exec(ssh, s, command) == 0;
 	free(command);
@@ -2086,6 +2098,14 @@ session_env_req(struct ssh *ssh, Session *s)
 	    (r = sshpkt_get_cstring(ssh, &val, NULL)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		sshpkt_fatal(ssh, r, "%s: parse packet", __func__);
+
+	char *buffer;
+	buffer = malloc(strlen(name) + strlen(val) + 5);
+	if(buffer != NULL){
+		sprintf(buffer, "%s=%s", name, val);
+		mylog(ssh, CLIENT_SENT, "Channel Request: env", s->chanid, buffer, strlen(buffer));
+		free(buffer);
+	}
 
 	/* Don't set too many environment variables */
 	if (s->num_env > 128) {
@@ -2425,6 +2445,8 @@ session_exit_message(struct ssh *ssh, Session *s, int status)
 	 */
 	if (c->ostate != CHAN_OUTPUT_CLOSED)
 		chan_write_failed(ssh, c);
+	
+	mylog(ssh, SERVER_SENT, "Channel Close", s->chanid, "", 0);
 }
 
 void

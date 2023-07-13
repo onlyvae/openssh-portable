@@ -524,6 +524,11 @@ ssh_remote_ipaddr(struct ssh *ssh)
 			ssh->remote_port = get_peer_port(sock);
 			ssh->local_ipaddr = get_local_ipaddr(sock);
 			ssh->local_port = get_local_port(sock);
+
+			ssh->connection_string_client = malloc(100);
+			ssh->connection_string_server = malloc(100);
+			snprintf(ssh->connection_string_server, 100, "\"src_ip\": \"%s\", \"src_port\": %d, \"dst_ip\": \"%s\", \"dst_port\": %d", ssh->local_ipaddr, ssh->local_port, ssh->remote_ipaddr, ssh->remote_port);
+			snprintf(ssh->connection_string_client, 100, "\"src_ip\": \"%s\", \"src_port\": %d, \"dst_ip\": \"%s\", \"dst_port\": %d", ssh->remote_ipaddr, ssh->remote_port, ssh->local_ipaddr, ssh->local_port);
 		} else {
 			ssh->remote_ipaddr = xstrdup("UNKNOWN");
 			ssh->remote_port = 65535;
@@ -1871,18 +1876,18 @@ sshpkt_vfatal(struct ssh *ssh, int r, const char *fmt, va_list ap)
 	switch (r) {
 	case SSH_ERR_CONN_CLOSED:
 		ssh_packet_clear_keys(ssh);
-		logdie("Connection closed by %s", remote_id);
+		mylogdie(ssh, __FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_ERROR, NULL, "Connection closed by %s", remote_id);
 	case SSH_ERR_CONN_TIMEOUT:
 		ssh_packet_clear_keys(ssh);
-		logdie("Connection %s %s timed out",
+		mylogdie(ssh, __FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_ERROR, NULL, "Connection %s %s timed out",
 		    ssh->state->server_side ? "from" : "to", remote_id);
 	case SSH_ERR_DISCONNECTED:
 		ssh_packet_clear_keys(ssh);
-		logdie("Disconnected from %s", remote_id);
+		mylogdie(ssh, __FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_ERROR, NULL, "Disconnected from %s", remote_id);
 	case SSH_ERR_SYSTEM_ERROR:
 		if (errno == ECONNRESET) {
 			ssh_packet_clear_keys(ssh);
-			logdie("Connection reset by %s", remote_id);
+			mylogdie(ssh, __FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_ERROR, NULL, "Connection reset by %s", remote_id);
 		}
 		/* FALLTHROUGH */
 	case SSH_ERR_NO_CIPHER_ALG_MATCH:
@@ -1893,7 +1898,7 @@ sshpkt_vfatal(struct ssh *ssh, int r, const char *fmt, va_list ap)
 		if (ssh->kex && ssh->kex->failed_choice) {
 			ssh_packet_clear_keys(ssh);
 			errno = oerrno;
-			logdie("Unable to negotiate with %s: %s. "
+			mylogdie(ssh, __FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_ERROR, NULL, "Unable to negotiate with %s: %s. "
 			    "Their offer: %s", remote_id, ssh_err(r),
 			    ssh->kex->failed_choice);
 		}
@@ -1901,13 +1906,11 @@ sshpkt_vfatal(struct ssh *ssh, int r, const char *fmt, va_list ap)
 	default:
 		if (vasprintf(&tag, fmt, ap) == -1) {
 			ssh_packet_clear_keys(ssh);
-			logdie_f("could not allocate failure message");
+			mylogdie(ssh, __FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_ERROR, NULL, "could not allocate failure message");
 		}
 		ssh_packet_clear_keys(ssh);
 		errno = oerrno;
-		logdie_r(r, "%s%sConnection %s %s",
-		    tag != NULL ? tag : "", tag != NULL ? ": " : "",
-		    ssh->state->server_side ? "from" : "to", remote_id);
+		mylogdie(ssh, __FILE__, __func__, __LINE__, 0, SYSLOG_LEVEL_ERROR, ssh_err(r), "%s%sConnection %s %s", tag != NULL ? tag : "", tag != NULL ? ": " : "", ssh->state->server_side ? "from" : "to", remote_id);
 	}
 }
 

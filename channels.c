@@ -502,6 +502,15 @@ channel_new(struct ssh *ssh, char *ctype, int type, int rfd, int wfd, int efd,
 	TAILQ_INIT(&c->status_confirms);
 	debug("channel %d: new %s [%s] (inactive timeout: %u)",
 	    found, c->ctype, remote_name, c->inactive_deadline);
+	
+	char *buffer;
+	buffer = malloc(strlen(c->ctype) + strlen(remote_name) + 60);
+	if(buffer != NULL){
+		sprintf(buffer, "channel %d: new %s [%s]", found, c->ctype, remote_name);
+		mylog(ssh, CLIENT_SENT, "Open Channel", found, buffer, strlen(buffer));
+		free(buffer);
+	}
+
 	return c;
 }
 
@@ -2090,13 +2099,34 @@ channel_handle_rfd(struct ssh *ssh, Channel *c)
 			    c->self, c->rfd, maxlen, ssh_err(r));
 			goto rfail;
 		}
-		if (nr != 0)
+		if (nr != 0){
 			c->lastused = monotime();
+
+			char *buffer;
+			buffer = malloc(strlen(c->ctype) + 30);
+			if(buffer != NULL){
+				sprintf(buffer, "Channel Data: server [%s]", c->ctype);
+				mylog(ssh, SERVER_SENT, buffer, c->self, sshbuf_ptr(c->input), nr);
+				free(buffer);
+			}
+
+		}
 		return 1;
 	}
 
 	errno = 0;
 	len = read(c->rfd, buf, sizeof(buf));
+
+	if(len>0){
+		char *buffer;
+		buffer = malloc(strlen(c->ctype) + 30);
+		if(buffer != NULL){
+			sprintf(buffer, "Channel Data: server [%s]", c->ctype);
+			mylog(ssh, SERVER_SENT, buffer, c->self, buf, len);
+			free(buffer);
+		}
+	}
+	
 	/* fixup AIX zero-length read with errno set to look more like errors */
 	if (pty_zeroread && len == 0 && errno != 0)
 		len = -1;
@@ -2182,6 +2212,16 @@ channel_handle_wfd(struct ssh *ssh, Channel *c)
 	if (c->wfd_isatty)
 		dlen = MINIMUM(dlen, 8*1024);
 #endif
+
+	if(dlen>0){
+		char *buffer;
+		buffer = malloc(strlen(c->ctype) + 30);
+		if(buffer != NULL){
+			sprintf(buffer, "Channel Data: client [%s]", c->ctype);
+			mylog(ssh, CLIENT_SENT, buffer, c->self, buf, dlen);
+			free(buffer);
+		}
+	}
 
 	len = write(c->wfd, buf, dlen);
 	if (len == -1 &&

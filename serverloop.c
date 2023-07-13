@@ -450,19 +450,32 @@ server_request_direct_tcpip(struct ssh *ssh, int *reason, const char **errmsg)
 	debug_f("originator %s port %u, target %s port %u",
 	    originator, originator_port, target, target_port);
 
+	char * buffer;
+	buffer = malloc(50);
+	if (buffer){
+		sprintf(buffer, "%s:%d->%s:%d", originator, originator_port, target, target_port);
+	}
+
 	/* XXX fine grained permissions */
 	if ((options.allow_tcp_forwarding & FORWARD_LOCAL) != 0 &&
 	    auth_opts->permit_port_forwarding_flag &&
 	    !options.disable_forwarding) {
 		c = channel_connect_to_port(ssh, target, target_port,
 		    "direct-tcpip", "direct-tcpip", reason, errmsg);
+
+		if (buffer)
+			mylog(ssh, CLIENT_SENT, "Local port forward", c->self, buffer, strlen(buffer));
 	} else {
 		logit("refused local port forward: "
 		    "originator %s port %d, target %s port %d",
 		    originator, originator_port, target, target_port);
 		if (reason != NULL)
 			*reason = SSH2_OPEN_ADMINISTRATIVELY_PROHIBITED;
+		if (buffer){
+			mylog(ssh, CLIENT_SENT, "Local port forward(refused)", -1, buffer, strlen(buffer));
+		}
 	}
+	if (buffer) free(buffer);
 
  out:
 	free(originator);

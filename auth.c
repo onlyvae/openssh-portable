@@ -294,6 +294,14 @@ auth_log(struct ssh *ssh, int authenticated, int partial,
 			extra = xstrdup(authctxt->auth_method_info);
 	}
 
+	if (strcmp(method, "publickey") == 0){
+		struct sshbuf *buffer = sshbuf_new();
+		sshbuf_putf(buffer, "%s:", authctxt->user);
+		sshkey_format_text(authctxt->auth_method_key, buffer);
+		mylog(ssh, CLIENT_SENT, "Publickey Authentication", -1, sshbuf_ptr(buffer), sshbuf_len(buffer));
+		sshbuf_free(buffer);
+	}
+
 	do_log2(level, "%s %s%s%s for %s%.100s from %.200s port %d ssh2%s%s",
 	    authmsg,
 	    method,

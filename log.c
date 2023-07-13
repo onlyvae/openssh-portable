@@ -37,7 +37,7 @@
 #include "includes.h"
 
 #include <sys/types.h>
-
+#include <time.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -52,6 +52,9 @@
 
 #include "log.h"
 #include "match.h"
+#include "packet.h"
+#include "kex.h"
+#include "sshbuf.h"
 
 static LogLevel log_level = SYSLOG_LEVEL_INFO;
 static int log_on_stderr = 1;
@@ -497,4 +500,88 @@ sshlogdirect(LogLevel level, int forced, const char *fmt, ...)
 	va_start(args, fmt);
 	do_log(level, forced, NULL, fmt, args);
 	va_end(args);
+}
+
+char hexdig(unsigned char x) {
+	if (x > 0xf)
+		return 'X';
+
+	if (x < 10)
+		return '0' + x;
+	else
+		return 'a' + x - 10;
+}
+
+static char *now(){
+	static char datestr[40];
+	struct timeval curTime;
+	gettimeofday(&curTime, NULL);
+	// long milli = curTime.tv_usec / 1000000;
+	struct tm utc_tm;
+	gmtime_r(&curTime.tv_sec, &utc_tm);
+
+ 	char buffer[20] = {0};
+	strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S", &utc_tm);
+
+    snprintf(datestr, sizeof(datestr), "%s.%06ld", buffer, curTime.tv_usec);
+	return datestr;
+}
+
+void mylog(struct ssh *ssh, int direction, char *comment, unsigned int channel_id, char *payload, int len){
+	static FILE *fp;
+
+	/* Open log file */
+	if (fp == NULL) {
+		fp = fopen("/var/log/ssh.log", "a+");
+		if (fp == NULL){
+			debug("Log file open failed");
+			debug(strerror(errno));
+			return;
+		}
+	}
+
+	/* Init session id */
+	if (ssh->session_id_hex == NULL && sshbuf_len(ssh->kex->session_id) > 16){
+		unsigned char *hash = sshbuf_ptr(ssh->kex->session_id);
+		ssh->session_id_hex = malloc(32);
+		for (int i=0; i<16; i++){
+			int pos = 2*i;
+			ssh->session_id_hex[pos] = hexdig(hash[i] >> 4);
+			ssh->session_id_hex[pos+1] = hexdig(hash[i] & 0x0f);
+		}
+	}
+
+	unsigned char * base64str;
+	unsigned long base64len;
+	base64len = (len + 2)/3*4 + (len-1)/57 + 10;
+	base64str = malloc(base64len);
+	if (base64str != NULL){
+		if (b64_ntop(payload, len, base64str, base64len) != -1){
+			fprintf(fp, "{\"session\": \"%s\", \"timestamp\": \"%s\", %s, \"comment\": \"%s\",\"channel\": \"%d\", \"payload\": \"%s\"}\n", 
+					ssh->session_id_hex, 
+					now(), 
+					direction == CLIENT_SENT ? ssh->connection_string_client : ssh->connection_string_server, 
+					comment, 
+					channel_id, 
+					base64str);
+			fflush(fp);
+		}
+		free(base64str);
+	}
+}
+
+void
+mylogdie(struct ssh *ssh, const char *file, const char *func, int line, int showfunc, LogLevel level, const char *suffix, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	sshlogv(file, func, line, showfunc, SYSLOG_LEVEL_INFO, suffix, fmt, args);
+
+	va_start(args, fmt);
+	char msgbuf[MSGBUFSIZ];
+	int len = vsnprintf(msgbuf, sizeof(msgbuf), fmt, args);
+	mylog(ssh, CLIENT_SENT, "Exit", -1, msgbuf, len);
+	
+	va_end(args);
+	cleanup_exit(255);
 }

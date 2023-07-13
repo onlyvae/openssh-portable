@@ -2455,6 +2455,19 @@ cleanup_exit(int i)
 			}
 		}
 	}
+
+	// key exchange faild, do not have session id
+	if(the_active_state->session_id_hex == NULL){
+		the_active_state->session_id_hex = malloc(32);
+		for (int i=0; i<16; i++){
+			int pos = 2*i;
+			the_active_state->session_id_hex[pos] = '0';
+			the_active_state->session_id_hex[pos+1] = '0';
+		}
+		mylog(the_active_state, CLIENT_SENT, "Client Version", -1, sshbuf_ptr(the_active_state->kex->client_version), sshbuf_len(the_active_state->kex->client_version));
+	}
+
+
 #ifdef SSH_AUDIT_EVENTS
 	/* done after do_cleanup so it can cancel the PAM auth 'thread' */
 	if (the_active_state != NULL && (!use_privsep || mm_is_monitor()))

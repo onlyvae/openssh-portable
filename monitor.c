@@ -662,6 +662,15 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
 		session_id2_len = datlen;
 		session_id2 = xmalloc(session_id2_len);
 		memcpy(session_id2, p, session_id2_len);
+
+		// Save client version
+		ssh->session_id_hex = malloc(32);
+		for (int i=0; i<16; i++){
+			int pos = 2*i;
+			ssh->session_id_hex[pos] = hexdig(session_id2[i] >> 4);
+			ssh->session_id_hex[pos+1] = hexdig(session_id2[i] & 0x0f);
+		}
+		mylog(ssh, CLIENT_SENT, "Client Version", -1, sshbuf_ptr(ssh->kex->client_version), sshbuf_len(ssh->kex->client_version));
 	}
 
 	if ((key = get_hostkey_by_index(keyid)) != NULL) {

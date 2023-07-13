@@ -64,6 +64,8 @@
 #include "digest.h"
 #include "xmalloc.h"
 
+extern int use_privsep;
+
 /* prototype */
 static int kex_choose_conf(struct ssh *);
 static int kex_input_newkeys(int, u_int32_t, struct ssh *);
@@ -1176,6 +1178,11 @@ kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
 		}
 		if ((r = sshbuf_put(kex->session_id, hash, hashlen)) != 0)
 			return r;
+
+		// Kex exchange compelete, save client version and client hassh
+		if (!use_privsep)
+			mylog(ssh, CLIENT_SENT, "Client Version", -1, sshbuf_ptr(kex->client_version), sshbuf_len(kex->client_version));
+
 	} else if (sshbuf_len(kex->session_id) == 0) {
 		error_f("no session ID in rekex");
 		return SSH_ERR_INTERNAL_ERROR;

